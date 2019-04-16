@@ -16,7 +16,11 @@
  */
 int mkFS(long deviceSize)
 {
-	return -1;
+	if(deviceSize>=MIN_HDD || deviceSize<=MAX_HDD){
+		return 0;
+	}else{
+		return -1;
+	}
 }
 
 /*

@@ -1,6 +1,9 @@
 # Prerequisites
 *.d
 .vscode
+test
+disk.dat
+create_disk
 
 # Object files
 *.o
