@@ -26,3 +26,28 @@ static inline void bitmap_setbit(char *bitmap_, int i_, int val_) {
 }
 
 //estructuras de datos y metadatos aqui 
+struct i_nodo
+{
+  char nombre[32];
+  char data[BLOCK_SIZE];
+  int usado; // 0 no usado y 1 usado
+  int number;								/* Numero de bloques que componen el fichero */
+  int position;
+};
+
+
+struct SB {
+  int numBloquesMapaDatos; 			/* Número de bloques del mapa datos */
+  int numInodos; 						/* Número de inodos en el dispositivo */
+  int primerInodo; 					/* Número bloque del 1º inodo del disp. (inodo raíz) */
+  int numBloquesDatos; 				/* Número de bloques de datos en el disp. */
+  int busynodes;						/* Numero de nodos que estan en uso */	
+  int primerBloqueDatos; 				/* Número de bloque del 1º bloque de datos */
+  int tamDispositivo; 					/* Tamaño total del disp. (en bytes) */
+  int numTotalBloques;					/* Numero total de bloques pasador por parametro */
+  char bitMap[MAX_FILES/8];			/* Mapa de bits inodos 5B */
+  struct i_nodo arraynode [MAX_FILES]; 		/* array de i- nodos 1600B */
+};
+
+
+
