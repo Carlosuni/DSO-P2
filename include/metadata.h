@@ -33,6 +33,7 @@ struct i_nodo
   int usado; // 0 no usado y 1 usado
   int number;								/* Numero de bloques que componen el fichero */
   int position;
+  int lleno;
 };
 
 
