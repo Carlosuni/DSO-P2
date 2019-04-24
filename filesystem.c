@@ -10,17 +10,54 @@
 #include "include/auxiliary.h"  // Headers for auxiliary functions
 #include "include/metadata.h"   // Type and structure declaration of the file system
 
+
+struct SB sb;
 /*
  * @brief 	Generates the proper file system structure in a storage device, as designed by the student.
  * @return 	0 if success, -1 otherwise.
  */
 int mkFS(long deviceSize)
 {
-	if(deviceSize>=MIN_HDD || deviceSize<=MAX_HDD){
-		return 0;
-	}else{
-		return -1;
-	}
+		int i;
+
+	/*Saber el numero de bloques introducidos*/
+	int aux = deviceSize/BLOCK_SIZE;
+
+	/*Comprobar el tamaño minimo y maximo del sistema*/
+	if (deviceSize < MIN_HDD){
+		perror("FileSystem does not reach the min Size of 50KiB");
+	 return -1; 
+	 }
+	 if (deviceSize > MAX_HDD){
+		perror("FileSystem exceeding the max Size of 10MiB");
+	 return -1; 
+	 }
+
+	 sb.tamDispositivo = deviceSize;	/* Tamanyo maximo del dispositivo */
+	 sb.numTotalBloques = aux; 			/* Los bloques introducidos en el proceso test */
+	 sb.numInodos = MAX_FILES; 		/* Vamos a tener como maximo 40 nodos 1 por cada fichero que el maximo que son es 40*/
+	 sb.primerBloqueDatos = 1;			/* Tenemos reservado el bloque 0 para el superbloque y los inodos */
+	 sb.numBloquesMapaDatos = aux -1; 	/* El numero maximo de bloques que podemos usar para guardar datos */
+
+	 /*mapa de bits inicializado a 0 para saber que todos los inodos estan libres*/
+	 for (i = 0; i < MAX_FILES; i++){
+	 	bitmap_setbit(sb.bitMap, i, 0);
+	 	sb.arraynode[i].fd = -1;			/* Iniciamos los descriptores de fichero asiciados a todos los nodos a -1 */
+	 } 
+
+	 /* Iniciar los bloques de datos con una posicion y como vacios todos */
+	 data = calloc(sb.numBloquesMapaDatos, sizeof(data));
+	 for (int j = 1; j < sb.numTotalBloques; j++){
+	 	data[j].position = j; 			/* Enumerar los bloque para tenerlos controlados desde 1 a N */
+	 	data[j].full = '0';				/* Ponerlos todos como vacios */
+	 	/* No hace falta poner valores a los demas atributos de la estructura porque 
+	 		ya se han inicializado a 0 con la funcion calloc*/
+	 }
+
+	 /* Invocamos umount */
+	 unmountFS();
+
+	return 0;
 }
 
 /*
