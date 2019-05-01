@@ -71,7 +71,7 @@ int mkFS(long deviceSize)
 	{
 	  bitmap_setbit(ibit_map, i, 0);	// libre
 	  //if (i < 300)
-	  printf("bit: pos = %d, val = %x\n", i, bitmap_getbit(ibit_map, i));
+	  //printf("bit: pos = %d, val = %x\n", i, bitmap_getbit(ibit_map, i));
 
 	}
 	for (int i = 0; i < BLOCK_SIZE; i++)
@@ -142,6 +142,42 @@ int mkFS(long deviceSize)
  */
 int mountFS(void)
 {	
+	char buff[2048];
+	// leer bloque 0 con superbloque
+	bread(DEVICE_IMAGE, 0, buff);
+	memcpy(&sbloque, buff, sizeof(buff));
+
+	int bloque_actual = 1;
+	for (int i = 0; i < sbloque.num_bloques_mapa_inodos; i++)
+	{
+	  bread(DEVICE_IMAGE, bloque_actual, buff); 
+	  memcpy(ibit_map, buff, sizeof(buff));
+	  bloque_actual = bloques_inode_map[0].siguiente_bloq;
+	  //printf("%x\n", bitmap_getbit(ibit_map, 0));
+	}
+
+	bloque_actual = 2;
+	for (int i = 0; i < sbloque.num_bloques_mapa_datos; i++)
+	{
+	  bread(DEVICE_IMAGE, bloque_actual, buff); 
+	  memcpy(bbit_map, buff, sizeof(buff));
+	  bloque_actual = bloques_datos_map[0].siguiente_bloq;
+	  //printf("%x\n", bitmap_getbit(bbit_map, 0));
+	}
+
+	bloque_actual = 3;
+	for (int i = 0; i < sbloque.num_inodos; i++)
+	{
+	  bread(DEVICE_IMAGE, bloque_actual, buff); 
+	  memcpy(&inodos[0], buff, sizeof(buff));
+	  bloque_actual = inodos[0].bloque_next_inodo;
+	  //printf("%s\n", inodos[0].nombre);
+	}
+		
+	// leer los i-nodos a memoria
+	for (int i=0; i<(sbloque.num_inodos*sizeof(TipoInodoDisco)/BLOCK_SIZE); i++)
+		bread(DEVICE_IMAGE, i+sbloque.primer_inodo, ((char *)inodos + i*BLOCK_SIZE));
+
 	// /* Limpiamos inicialmente el superbloque */
 	// char* buff = malloc(2048);
 	// //printf("%d\n", sbloque.num_tot_bloques);
@@ -155,7 +191,7 @@ int mountFS(void)
 	// //printf("%s\n", buff);
 	// //printf("%d\n", sbloque.num_tot_bloques);
 
-	return -2;
+	return 0;
 }
 
 /*
@@ -164,11 +200,18 @@ int mountFS(void)
  */
 int unmountFS(void)
 {
-	// char* buff = malloc(2048);
-	// memcpy(&sbloque, buff, sizeof(sbloque));
+	// asegurarse de que todos los ficheros están cerrados
+	for (int i = 0; i < sbloque.num_inodos; i++) {
+	  if (inodos[i].en_uso == 1) {
+		  perror ("No es posible desmontar el sistema de ficheros. Hay nos en uso");
+	    return -1;
+	  }
+	}
+	
+	// escribir a disco los metadatos
+	sync();
 
-	// bwrite(DEVICE_IMAGE, 0, buff);
-	return -2;
+	return 0;
 }
 
 /*
@@ -283,15 +326,15 @@ int disk_sync()
 	//printf("tamanyo sbloque = %lu\n", sizeof(sbloque));
 	memcpy(buff, &sbloque, sizeof(sbloque));
 	bwrite(DEVICE_IMAGE, 0, buff);
-	printf("tamanyo buff = %lu\n", sizeof(buff));
+	//printf("tamanyo buff = %lu\n", sizeof(buff));
 
 	// escribir los bloques para el mapa de i-nodos
 	int bloque_actual = bloques_inode_map[0].pos_actual_bloq;
 	//printf("Bitmap 1 = %d\n", sbloque.ibit_map[0]);
 	for (int i = 0; i < sbloque.num_bloques_mapa_inodos; i++)
 	{
-	  printf("escribiendo mapa inodo\n");
-	  printf("ibit_map escrito\n%s", (char *)ibit_map);
+	  //printf("escribiendo mapa inodo\n");
+	  //printf("ibit_map escrito\n%s", (char *)ibit_map);
 	  bwrite(DEVICE_IMAGE, bloque_actual, ((char *)ibit_map));
 	  bloque_actual = bloques_inode_map[0].siguiente_bloq;
 	}
