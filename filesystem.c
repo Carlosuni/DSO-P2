@@ -13,51 +13,60 @@
 #include <stdlib.h>
 #include <string.h>
 
+TipoSuperbloque sbloque;
+TipoInodoDisco* datos_inodo;
 struct SB sb;
-struct i_nodo * datos;
+struct i_nodo* datos;
+Bloque_datos *bloque_datos;
+
 /*
  * @brief 	Generates the proper file system structure in a storage device, as designed by the student.
  * @return 	0 if success, -1 otherwise.
  */
 int mkFS(long deviceSize)
 {
-	int i;
+	/* Obtenemos el numero de bloques segun el tamanyo introducido */
+	// int aux = deviceSize/BLOCK_SIZE;
+	int num_bloques = deviceSize/BLOCK_SIZE;
 
-	/*Saber el numero de bloques introducidos*/
-	int aux = deviceSize/BLOCK_SIZE;
-
-	/*Comprobar el tamaño minimo y maximo del sistema*/
+	/* Comprueba que el tamanyo del device llega al minimo */
 	if (deviceSize < MIN_HDD){
 		perror("FileSystem does not reach the min Size of 50KiB");
 		return -1; 
 	}
-	 if (deviceSize > MAX_HDD){
+
+	/* Comprueba que el tamanyo del device no supera el maximo */
+	if (deviceSize > MAX_HDD){
 		perror("FileSystem exceeding the max Size of 10MiB");
 		return -1; 
 	}
 
-	sb.tamDispositivo = deviceSize;	/* Tamanyo maximo del dispositivo */
-	sb.numTotalBloques = aux; 			/* Los bloques introducidos en el proceso test */
-	sb.numInodos = MAX_FILES; 		/* Vamos a tener como maximo 40 nodos 1 por cada fichero que el maximo que son es 40*/
-	sb.primerBloqueDatos = 1;			/* Tenemos reservado el bloque 0 para el superbloque y los inodos */
-	sb.numBloquesMapaDatos = aux -1; 	/* El numero maximo de bloques que podemos usar para guardar datos */
-
-	 /*mapa de bits inicializado a 0 para saber que todos los inodos estan libres*/
-	for (i = 0; i < MAX_FILES; i++){
-		bitmap_setbit(sb.bitMap, i, 0);
-		sb.arraynode[i].usado = -1;			/* Iniciamos los descriptores de fichero asiciados a todos los nodos a -1 */
+	/* Guardamos los atributos del struct TipoSuperbloque de metadata.h */
+	sbloque.num_magico = 0x000D5500; 
+	sbloque.num_bloques_mapa_datos = num_bloques -1; 
+	sbloque.num_bloque_datos = num_bloques - 1; 
+	sbloque.num_tot_bloques = num_bloques; 						
+	sbloque.num_inodos = MAX_FILES; 		
+	sbloque.primer_bloque_datos = 1;
+	sbloque.tam_dispositivo = deviceSize;
+	/* El resto se inicializan a 0 por defecto */	
+			
+	/* Mapa de bits de inodos inicializado a 0 (libres) */
+	for (int i = 0; i < MAX_FILES; i++){
+		bitmap_setbit(sbloque.ibitMap, i, 0);
+		sbloque.arraynode[i].fd = -1;			/* Iniciamos los descriptores de inodos a -1 */
 	} 
 
-	 /* Iniciar los bloques de datos con una posicion y como vacios todos */
-	datos = calloc(sb.numBloquesMapaDatos, sizeof(datos));
-	for (int j = 1; j < sb.numTotalBloques; j++){
-	 	datos[j].position = j; 			/* Enumerar los bloque para tenerlos controlados desde 1 a N */
-	 	datos[j].lleno = '0';				/* Ponerlos todos como vacios */
+	/* Iniciar los bloques de datos con una posicion y como vacios todos */
+	bloque_datos = calloc(sbloque.num_tot_bloques, sizeof(datos));
+	for (int j = 1; j < sbloque.num_bloque_datos; j++){
+	 	bloque_datos[j].pos_bloq_actual = j; 			/* Enumerar los bloque para tenerlos controlados desde 1 a N */
+	 	bloque_datos[j].lleno = '0';				/* Ponerlos todos como vacios */
 	 	/* No hace falta poner valores a los demas atributos de la estructura porque 
 	 		ya se han inicializado a 0 con la funcion calloc*/
 	}
 
-	 /* Invocamos umount */
+	/* Invocamos umount */
 	unmountFS();
 
 	return 0;
@@ -68,12 +77,20 @@ int mkFS(long deviceSize)
  * @return 	0 if success, -1 otherwise.
  */
 int mountFS(void)
-{
+{	
+	/* Limpiamos inicialmente el superbloque */
 	char* buff = malloc(2048);
-	memcpy(&sb, buff, sizeof(sb));
+	printf("%d\n", sbloque.num_tot_bloques);
+	memcpy(&sbloque, buff, sizeof(sbloque));
+	printf("%s\n", buff);
 
-	/* Leer el SuperBloque  */
+
+	/* Leemos el superbloque  */
 	bread(DEVICE_IMAGE, 0, buff);
+	printf("%li\n", sizeof(sbloque));
+	printf("%s\n", buff);
+	printf("%d\n", sbloque.num_tot_bloques);
+	
 	return 0;
 }
 
@@ -84,7 +101,7 @@ int mountFS(void)
 int unmountFS(void)
 {
 	char* buff = malloc(2048);
-	memcpy(&sb, buff, sizeof(sb));
+	memcpy(&sbloque, buff, sizeof(sbloque));
 
 	bwrite(DEVICE_IMAGE, 0, buff);
 	return 0;
@@ -96,7 +113,36 @@ int unmountFS(void)
  */
 int createFile(char *path)
 {
-	return -2;
+	int val = 0;
+	/* Buscar que no exista un fichero que tenga el mismo nombre que el que se quiera crear */
+	for (int i = 0; i < sbloque.num_inodos; i++){
+		if (strcmp(path, sbloque.arraynode[i].nombre) == 0){
+			perror("File already exists");
+			return -1;
+		}
+	}
+
+	/* Buscar un espacio vacio */
+	for (int i = 0; i < sbloque.num_inodos; i++){
+		val = bitmap_getbit(sbloque.ibitMap, i);
+		if (val == '0'){ 								/* comprobamos que el inodo esta libre */
+			bitmap_setbit(sbloque.ibitMap, i, 1); 			/* Cambiamos el valor del i-nodo de FREE a BUSY  */
+			sbloque.arraynode[i].tamanyo = 0; 				/* Asignamos el tamaño inicial de 0B */
+			int aux = check_blq_libre();					/* Llamamos a la funcion para comprobar que haya algun ploque libre */
+			if (aux > 0){								/* Comprobamos el valor de la funcion */
+				sbloque.arraynode[i].bloqueDirecto = aux;	/* Asignamos dicho bloque como el primero en i-node */
+			} else {									/* En caso de que no haya bloques libres salta un error */
+				perror("File System can't create more files because all blocks of data are fulled");
+				return -2;
+			}
+			strcpy(sbloque.arraynode[i].nombre, path);	/* Copiamos el nombre del fichero */
+			bloque_datos[aux].num_bloques = 1;						/* Indicamos de cuantos bloques se compone el fichero */
+			bloque_datos[aux].pos_bloq_actual = aux;					/* Posicion actual del fichero */
+			bloque_datos[aux].siguiente_bloq = 0;
+			sbloque.bloques_en_uso++;								/* Actualizamos la variable con1 noda mas ocupado */
+		}		
+	}
+	return 0;
 }
 
 /*
@@ -178,4 +224,17 @@ int rmDir(char *path)
 int lsDir(char *path, int inodesDir[10], char namesDir[10][33])
 {
 	return -2;
+}
+
+/* Comprueba si hay blosques libres en el bitmap del superbloque
+y devuelve la posiciónd el primero que encuentre */
+int check_blq_libre()
+{
+	for (int i = 0; i < sb.numBloquesMapaDatos; i++)
+	{
+		if (bloque_datos[i].lleno == '0'){
+			return i;
+		}
+	}
+	return -1;
 }
