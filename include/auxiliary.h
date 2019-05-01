@@ -12,3 +12,4 @@
  * @return 	0 if success, -1 otherwise.
  */
 int check_blq_libre(void);
+int disk_sync(void);

@@ -49,7 +49,7 @@ int bread(char *deviceName, int blockNumber, char *buffer) {
  * Writes a block from a buffer to the device.
  * Returns 0 or -1 in case of error.
  */
-int bwrite(char *deviceName, int blockNumber, char*buffer) {
+int bwrite(char *deviceName, int blockNumber, char* buffer) {
 	int fd = open(deviceName, O_WRONLY);
 
 	if(fd < 0){

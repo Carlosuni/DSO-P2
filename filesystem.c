@@ -14,10 +14,16 @@
 #include <string.h>
 
 TipoSuperbloque sbloque;
-TipoInodoDisco* datos_inodo;
-struct SB sb;
-struct i_nodo* datos;
-Bloque_datos *bloque_datos;
+TipoInodoDisco inodos[MAX_FILES];
+Bloque_datos bloques_datos_aux;
+/* Preparado en caso de que hubiera mas 40 inodos y de 1 bloque de mapa de inodos*/
+Bloque_datos bloques_inode_map[BLOCK_SIZE/40+1];
+/* Preparado en caso de que hubiera mas 40 inodos y de 1 bloque de mapa de inodos*/
+Bloque_datos bloques_datos_map[25 - 4];
+
+char ibit_map[2048];			/* Mapa de bits inodos 5B */
+char bbit_map[2048];			/* Mapa de bits bloques 5B */
+
 
 /*
  * @brief 	Generates the proper file system structure in a storage device, as designed by the student.
@@ -43,31 +49,89 @@ int mkFS(long deviceSize)
 
 	/* Guardamos los atributos del struct TipoSuperbloque de metadata.h */
 	sbloque.num_magico = 0x000D5500; 
-	sbloque.num_bloques_mapa_datos = num_bloques -1; 
-	sbloque.num_bloque_datos = num_bloques - 1; 
-	sbloque.num_tot_bloques = num_bloques; 						
-	sbloque.num_inodos = MAX_FILES; 		
-	sbloque.primer_bloque_datos = 1;
+	sbloque.num_bloques_mapa_inodos = 1; 
+	sbloque.num_bloques_mapa_datos = 1; 
+	/* Iniciamos el numero d einodos a 1, ya que será variable
+	para optimizar el espacio */
+	sbloque.num_bloque_datos = 0;
+	sbloque.num_tot_bloques = num_bloques; 
+	sbloque.primer_bloque_datos = 0;       /* Num de bloque del primer bloque de datos */
 	sbloque.tam_dispositivo = deviceSize;
-	/* El resto se inicializan a 0 por defecto */	
-			
-	/* Mapa de bits de inodos inicializado a 0 (libres) */
-	for (int i = 0; i < MAX_FILES; i++){
-		bitmap_setbit(sbloque.ibitMap, i, 0);
-		sbloque.arraynode[i].fd = -1;			/* Iniciamos los descriptores de inodos a -1 */
-	} 
+	sbloque.max_inodos = MAX_FILES;
 
-	/* Iniciar los bloques de datos con una posicion y como vacios todos */
-	bloque_datos = calloc(sbloque.num_tot_bloques, sizeof(datos));
-	for (int j = 1; j < sbloque.num_bloque_datos; j++){
-	 	bloque_datos[j].pos_bloq_actual = j; 			/* Enumerar los bloque para tenerlos controlados desde 1 a N */
-	 	bloque_datos[j].lleno = '0';				/* Ponerlos todos como vacios */
-	 	/* No hace falta poner valores a los demas atributos de la estructura porque 
-	 		ya se han inicializado a 0 con la funcion calloc*/
+	/* Asignando el máximo de espacio restante a bloques de datos y su mapa */
+	// int bloques_restantes = sbloque.num_tot_bloques - 1 - sbloque.num_bloques_mapa_inodos - sbloque.num_inodos;
+	// printf("%u\n", sbloque.num_tot_bloques);
+	// printf("%d\n", bloques_restantes);
+	//sbloque.num_bloque_datos = (sbloque.num_tot_bloques*2048 - 2048 - sbloque.num_bloques_mapa_inodos*2048) / 2049; 
+
+	/* Preparamos a 0 (libres) los dos bitmaps,
+	aunque realmente la lista de nodos estará a 0 hasta meter el raíz */
+	for (int i = 0; i < BLOCK_SIZE; i++)
+	{
+	  bitmap_setbit(ibit_map, i, 0);	// libre
+	  //if (i < 300)
+	  printf("bit: pos = %d, val = %x\n", i, bitmap_getbit(ibit_map, i));
+
+	}
+	for (int i = 0; i < BLOCK_SIZE; i++)
+	  bitmap_setbit(bbit_map, i, 0);	// libre
+	for (int i = 0; i < sbloque.num_inodos; i++)
+	  memset(&(inodos[i]), 0, sizeof(TipoInodoDisco));
+	
+	char diskbloq_bit_map[BLOCK_SIZE];			/* Mapa de bits inodos 5B */
+	for (int i = 0; i < BLOCK_SIZE * 8; i++)
+	{
+	  bitmap_setbit(diskbloq_bit_map, i, 0);	// libre
+	  //printf("bit: pos = %d, val = %x\n", i, bitmap_getbit(diskbloq_bit_map, i));
 	}
 
-	/* Invocamos umount */
-	unmountFS();
+	/* Reseteamos el disco */
+	for (int i = 0; i < 200; i++)
+	  bwrite(DEVICE_IMAGE, i, diskbloq_bit_map);
+
+	
+	/* Creamos inodo del directorio raiz */
+	strcpy(inodos[0].nombre, "/");
+	inodos[0].tipo = 0;
+	inodos[0].num_bloque_inodo = 3;
+	sbloque.num_inodos = 1;
+	sbloque.primer_inodo = 3;              /* Num de bloque del primero inodo del disp (raiz) */	
+	sbloque.bloques_en_uso = 4;
+	//printf("Bitmap 1 = %d\n", sbloque.ibit_map[0]);
+
+	bitmap_setbit(ibit_map, 0, 1);	// usado
+	//printf("Bitmap 1 = %d\n", sbloque.ibit_map[0]);
+
+	/* Guardamos las posiciones de los primeros bloques de los mapas */
+	bloques_inode_map[0].pos_actual_bloq = 1;
+	bloques_datos_map[0].pos_actual_bloq = 2;
+	//bloques_inode_map[0].num_bloques = 1;
+	
+	/* Preparamos bloque auxiliar con mapa de datos */
+	//size_t tam_bloq_inodemap = sizeof(bloques_inode_map)/sizeof(bloques_inode_map[0]);
+	//bloques_datos_map[(sbloque.num_tot_bloques - 1 - tam_bloq_inodomap) / 2];
+
+			
+	// /* Mapa de bits de inodos inicializado a 0 (libres) */
+	// for (int i = 0; i < MAX_FILES; i++){
+	// 	bitmap_setbit(sbloque.ibitMap, i, 0);
+	// 	sbloque.arraynode[i].fd = -1;			/* Iniciamos los descriptores de inodos a -1 */
+	// } 
+
+	/* Iniciar los bloques de datos con una posicion y como vacios todos */
+	// bloque_datos = calloc(sbloque.num_tot_bloques, sizeof(datos));
+	// for (int i = 1; i < sbloque.num_bloque_datos; i++){
+	//  	bloque_datos[i].pos_bloq_actual = i; 			/* Enumerar los bloque para tenerlos controlados desde 1 a N */
+	//  	bloque_datos[i].lleno = '0';				/* Ponerlos todos como vacios */
+	//  	/* No hace falta poner valores a los demas atributos de la estructura porque 
+	//  		ya se han inicializado a 0 con la funcion calloc*/
+	// }
+
+	disk_sync();
+
+	// /* Invocamos umount */
+	// unmountFS();
 
 	return 0;
 }
@@ -78,20 +142,20 @@ int mkFS(long deviceSize)
  */
 int mountFS(void)
 {	
-	/* Limpiamos inicialmente el superbloque */
-	char* buff = malloc(2048);
-	printf("%d\n", sbloque.num_tot_bloques);
-	memcpy(&sbloque, buff, sizeof(sbloque));
-	printf("%s\n", buff);
+	// /* Limpiamos inicialmente el superbloque */
+	// char* buff = malloc(2048);
+	// //printf("%d\n", sbloque.num_tot_bloques);
+	// memcpy(&sbloque, buff, sizeof(sbloque));
+	// //printf("%s\n", buff);
 
 
-	/* Leemos el superbloque  */
-	bread(DEVICE_IMAGE, 0, buff);
-	printf("%li\n", sizeof(sbloque));
-	printf("%s\n", buff);
-	printf("%d\n", sbloque.num_tot_bloques);
-	
-	return 0;
+	// /* Leemos el superbloque  */
+	// bread(DEVICE_IMAGE, 0, buff);
+	// //printf("%li\n", sizeof(sbloque));
+	// //printf("%s\n", buff);
+	// //printf("%d\n", sbloque.num_tot_bloques);
+
+	return -2;
 }
 
 /*
@@ -100,11 +164,11 @@ int mountFS(void)
  */
 int unmountFS(void)
 {
-	char* buff = malloc(2048);
-	memcpy(&sbloque, buff, sizeof(sbloque));
+	// char* buff = malloc(2048);
+	// memcpy(&sbloque, buff, sizeof(sbloque));
 
-	bwrite(DEVICE_IMAGE, 0, buff);
-	return 0;
+	// bwrite(DEVICE_IMAGE, 0, buff);
+	return -2;
 }
 
 /*
@@ -113,36 +177,8 @@ int unmountFS(void)
  */
 int createFile(char *path)
 {
-	int val = 0;
-	/* Buscar que no exista un fichero que tenga el mismo nombre que el que se quiera crear */
-	for (int i = 0; i < sbloque.num_inodos; i++){
-		if (strcmp(path, sbloque.arraynode[i].nombre) == 0){
-			perror("File already exists");
-			return -1;
-		}
-	}
 
-	/* Buscar un espacio vacio */
-	for (int i = 0; i < sbloque.num_inodos; i++){
-		val = bitmap_getbit(sbloque.ibitMap, i);
-		if (val == '0'){ 								/* comprobamos que el inodo esta libre */
-			bitmap_setbit(sbloque.ibitMap, i, 1); 			/* Cambiamos el valor del i-nodo de FREE a BUSY  */
-			sbloque.arraynode[i].tamanyo = 0; 				/* Asignamos el tamaño inicial de 0B */
-			int aux = check_blq_libre();					/* Llamamos a la funcion para comprobar que haya algun ploque libre */
-			if (aux > 0){								/* Comprobamos el valor de la funcion */
-				sbloque.arraynode[i].bloqueDirecto = aux;	/* Asignamos dicho bloque como el primero en i-node */
-			} else {									/* En caso de que no haya bloques libres salta un error */
-				perror("File System can't create more files because all blocks of data are fulled");
-				return -2;
-			}
-			strcpy(sbloque.arraynode[i].nombre, path);	/* Copiamos el nombre del fichero */
-			bloque_datos[aux].num_bloques = 1;						/* Indicamos de cuantos bloques se compone el fichero */
-			bloque_datos[aux].pos_bloq_actual = aux;					/* Posicion actual del fichero */
-			bloque_datos[aux].siguiente_bloq = 0;
-			sbloque.bloques_en_uso++;								/* Actualizamos la variable con1 noda mas ocupado */
-		}		
-	}
-	return 0;
+	return -2;
 }
 
 /*
@@ -228,13 +264,53 @@ int lsDir(char *path, int inodesDir[10], char namesDir[10][33])
 
 /* Comprueba si hay blosques libres en el bitmap del superbloque
 y devuelve la posiciónd el primero que encuentre */
-int check_blq_libre()
+// int check_blq_libre()
+// {
+// 	for (int i = 0; i < sb.numBloquesMapaDatos; i++)
+// 	{
+// 		if (bloque_datos[i].lleno == '0'){
+// 			return i;
+// 		}
+// 	}
+// 	return -1;
+// }
+
+int disk_sync()
 {
-	for (int i = 0; i < sb.numBloquesMapaDatos; i++)
+	// // escribir superbloque a disco
+	char buff[2048];
+	// //printf("tamanyo buff = %lu\n", sizeof(buff));
+	//printf("tamanyo sbloque = %lu\n", sizeof(sbloque));
+	memcpy(buff, &sbloque, sizeof(sbloque));
+	bwrite(DEVICE_IMAGE, 0, buff);
+	printf("tamanyo buff = %lu\n", sizeof(buff));
+
+	// escribir los bloques para el mapa de i-nodos
+	int bloque_actual = bloques_inode_map[0].pos_actual_bloq;
+	//printf("Bitmap 1 = %d\n", sbloque.ibit_map[0]);
+	for (int i = 0; i < sbloque.num_bloques_mapa_inodos; i++)
 	{
-		if (bloque_datos[i].lleno == '0'){
-			return i;
-		}
+	  printf("escribiendo mapa inodo\n");
+	  printf("ibit_map escrito\n%s", (char *)ibit_map);
+	  bwrite(DEVICE_IMAGE, bloque_actual, ((char *)ibit_map));
+	  bloque_actual = bloques_inode_map[0].siguiente_bloq;
 	}
-	return -1;
+
+	// escribir los bloques para el mapa de bloques de datos
+	bloque_actual = bloques_datos_map[0].pos_actual_bloq;
+	for (int i = 0; i < sbloque.num_bloques_mapa_datos; i++)
+	{
+	  bwrite(DEVICE_IMAGE, bloque_actual, ((char *)bbit_map));
+	  bloque_actual = bloques_datos_map[0].siguiente_bloq;
+	}
+	
+	// escribir los i-nodos a disco
+	bloque_actual = inodos[0].num_bloque_inodo;
+	for (int i = 0; i < sbloque.num_inodos; i++)
+	{
+	  bwrite(DEVICE_IMAGE, bloque_actual, ((char *) inodos + i * BLOCK_SIZE));
+	  bloque_actual = inodos[i].bloque_next_inodo;
+	}
+
+	return 0;
 }

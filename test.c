@@ -24,7 +24,7 @@ int main()
 	int ret;
 
 	///////
-	printf("AQUI\n");
+	//printf("AQUI\n");
 
 	ret = mkFS(DEV_SIZE);
 	if (ret != 0)
