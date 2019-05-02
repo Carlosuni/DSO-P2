@@ -47,6 +47,7 @@ typedef struct {
   unsigned int num_bloque_inodo;         /* Numero del bloque del inodo */
   unsigned int bloque_next_inodo;
   unsigned int inodosContenidos[DIR_MAX_FILES];   /* Si tipo dir, num de files o dirs contenidos, si tipo file, 0 */
+  unsigned int num_contenidos;
   unsigned int tamanyo;                 /* Tamanyo actual del fichero en bytes */
   unsigned int bloqueDirecto;           /* Numero del bloque directo */
   unsigned int bloqueIndirecto;         /* Numero del bloque indirecto */

@@ -13,3 +13,6 @@
  */
 int check_blq_libre(void);
 int disk_sync(void);
+int ialloc_custom(void);
+int alloc_custom(void);
+

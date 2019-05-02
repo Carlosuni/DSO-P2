@@ -93,7 +93,7 @@ int mkFS(long deviceSize)
 	
 	/* Creamos inodo del directorio raiz */
 	strcpy(inodos[0].nombre, "/");
-	inodos[0].tipo = 0;
+	inodos[0].tipo = 1;
 	inodos[0].num_bloque_inodo = 3;
 	sbloque.num_inodos = 1;
 	sbloque.primer_inodo = 3;              /* Num de bloque del primero inodo del disp (raiz) */	
@@ -220,8 +220,33 @@ int unmountFS(void)
  */
 int createFile(char *path)
 {
+	int new_b_id, new_bloqinode_id, new_inodo_id ;
 
-	return -2;
+	new_inodo_id = ialloc_custom();
+	if (new_inodo_id < 0)
+	{
+		return new_inodo_id;
+	}
+	
+	new_bloqinode_id = alloc_custom();
+	if (new_bloqinode_id < 0) { ifree_custom(new_inodo_id); return new_b_id ; }
+	new_b_id = alloc_custom();
+	if (new_b_id < 0) { ifree_custom(new_inodo_id); return new_b_id ; }
+	strcpy(inodos[new_inodo_id].nombre, path);
+	bloques_datos_map[new_bloqinode_id].pos_actual_bloq = 2;
+
+	inodos[new_inodo_id].num_bloque_inodo = new_bloqinode_id;
+	inodos[new_inodo_id - 1].bloque_next_inodo = new_bloqinode_id;
+	inodos[new_inodo_id - 1].num_contenidos = 1;
+	inodos[new_inodo_id - 1].inodosContenidos[inodos[new_inodo_id - 1].num_contenidos - 1] = new_bloqinode_id;
+	inodos[new_inodo_id].bloqueDirecto = new_b_id;
+
+
+	// inodos[inodo_id].bloqueDirecto = new_b_id ;
+	// inodos_x[inodo_id].posicion = 0;
+	// inodos_x[inodo_id].abierto = 1;
+
+	return 0;
 }
 
 /*
@@ -356,4 +381,75 @@ int disk_sync()
 	}
 
 	return 0;
+}
+
+/* Devuelve el primer inodo libre que encuentra*/
+int ialloc_custom(void)
+{
+	// buscar un i-nodo libre
+	for (int i = 0; i < sbloque.num_inodos; i++)
+	{
+		if (ibit_map[i] == 0)
+		{
+			// inodo ocupado ahora
+			ibit_map[i] = 1;
+			// valores por defecto en el i-nodo
+			//memset(&(inodos[i]), 0, sizeof(TipoInodoDisco));
+			// devolver identificador de i-nodo
+			return i;
+		}
+	}
+	return -1;
+}
+
+/* Devuelve el primer bloque libre que encuentra*/
+int alloc_custom(void)
+{
+	char b[BLOCK_SIZE];	
+	
+	for (int i = 0; i < BLOCK_SIZE; i++)
+	{
+		if (bbit_map[i] == 0) {
+			// bloque ocupado ahora
+			bbit_map[i] = 1;
+			// valores por defecto en el bloque
+			//memset(b, 0, BLOCK_SIZE);
+			//bwrite(DISK, sbloque.primerBloqueDatos + i, b);
+			// devolver identificador del bloque
+			if (i >= sizeof(bloques_datos_map)/sizeof(bloques_datos_map[0]))
+			{
+				printf("No caben mas bloques");
+				return -1;
+			}
+			return i;
+		}
+	}
+	return -1;
+}
+
+/* Devuelve el primer bloque libre que encuentra*/
+int alloc_databloq_custom(int id_bloque_Datos)
+{
+	char b[BLOCK_SIZE];	
+	
+	for (int i = 0; i < sizeof(bloques_datos_map)/sizeof(bloques_datos_map[0]); i++)
+	{
+		int no_inodo = check_free_inode(id_bloque_Datos);
+		check_free_inode
+					if (i > 3 && inodos[j].num_bloque_inodo)
+			return i;
+	}
+	return -1;
+}
+
+int check_free_inode(int num_bloque)
+{
+	for (int i = 0; i < sbloque.num_inodos; i++)
+	{
+		if (inodos[i].num_bloque_inodo)
+		{
+			return 0;
+		}
+	}
+	return 1;
 }
