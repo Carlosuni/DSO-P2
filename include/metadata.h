@@ -54,6 +54,7 @@ typedef struct {
   char relleno[PADDING_INODO];          /* Caracter de relleno = '0' */
   unsigned int en_uso;                   /* Sin usar 0, usado 1*/
   int fd;                   /* Sin usar 0, usado 1*/
+  int nivel_jerar;
 } TipoInodoDisco;
 
 
