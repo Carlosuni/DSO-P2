@@ -315,18 +315,62 @@ int lseekFile(int fileDescriptor, long offset, int whence)
  * @brief	Creates a new directory provided it it doesn't exist in the file system.
  * @return	0 if success, -1 if the directory already exists, -2 in case of error.
  */
+//crea directorio de nivel 1 
 int mkDir(char *path)
 {
-	return -2;
+	char * nombre = strtok(path, "/");
+	int new_b_id, new_bloqinode_id, new_inodo_id ;
+
+	new_inodo_id = ialloc_custom();
+	if (new_inodo_id < 0)
+	{
+		return new_inodo_id;
+	}
+	
+	new_bloqinode_id = alloc_custom();
+	if (new_bloqinode_id < 0)
+	{
+		//ifree_custom(new_inodo_id);
+		return new_bloqinode_id ;
+	}
+	new_b_id = alloc_custom();
+	if (new_b_id < 0)
+	{
+		//ifree_custom(new_inodo_id);
+		return new_b_id ;
+	}
+	/*for(int i=0;i<=MAX_FILES-1;i++){
+		if(strcmp(inodos[i].nombre, nombre)==0){
+			return -1;
+		}
+	}*/
+	strcpy(inodos[new_inodo_id].nombre, nombre);
+	inodos[new_b_id].tipo = T_DIR;
+	inodos[new_b_id].en_uso = 1;
+	return 0;
 }
 
 /*
  * @brief	Deletes a directory, provided it exists in the file system.
  * @return	0 if success, -1 if the directory does not exist, -2 in case of error..
  */
+//eliminar un directorio de nivel 1 
 int rmDir(char *path)
 {
-	return -2;
+	char * nombre = strtok(path, "/");
+	int encontrado=-1;
+	for(int i=0;i<=MAX_FILES-1;i++){
+		if(strcmp(inodos[i].nombre, nombre)==0){
+			inodos[i].en_uso=0;
+			encontrado=0;
+			return 0;
+		}
+	}
+	if(encontrado==-1){
+		return -1;
+	}else{
+		return -2;
+	}
 }
 
 /*

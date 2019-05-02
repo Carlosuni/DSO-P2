@@ -19,6 +19,8 @@
 #define MAX_PATH_FOLDER 99 //unds, nombre incluido
 #define PADDING_SB 0 //unds, nombre incluido
 #define PADDING_INODO 0 //unds, nombre incluido
+#define T_FILE 0
+#define T_DIR 1
 
 
 #define bitmap_getbit(bitmap_, i_) (bitmap_[i_ >> 3] & (1 << (i_ & 0x07)))
