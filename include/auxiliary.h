@@ -15,4 +15,10 @@ int check_blq_libre(void);
 int disk_sync(void);
 int ialloc_custom(void);
 int alloc_custom(void);
+int alloc_databloq_custom(int id_bloque_Datos);
+int check_free_inode(int id_bloque_Datos);
+int check_free_databloq(int id_bloque_Datos);
+
+
+/* TODO: Comprobar que se han incluido todas*/
 

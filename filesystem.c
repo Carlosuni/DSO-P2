@@ -15,7 +15,7 @@
 
 TipoSuperbloque sbloque;
 TipoInodoDisco inodos[MAX_FILES];
-Bloque_datos bloques_datos_aux;
+Bloque_datos bloques_datos_aux[2048];
 /* Preparado en caso de que hubiera mas 40 inodos y de 1 bloque de mapa de inodos*/
 Bloque_datos bloques_inode_map[BLOCK_SIZE/40+1];
 /* Preparado en caso de que hubiera mas 40 inodos y de 1 bloque de mapa de inodos*/
@@ -229,12 +229,20 @@ int createFile(char *path)
 	}
 	
 	new_bloqinode_id = alloc_custom();
-	if (new_bloqinode_id < 0) { ifree_custom(new_inodo_id); return new_b_id ; }
+	if (new_bloqinode_id < 0)
+	{
+		//ifree_custom(new_inodo_id);
+		return new_bloqinode_id ;
+	}
 	new_b_id = alloc_custom();
-	if (new_b_id < 0) { ifree_custom(new_inodo_id); return new_b_id ; }
+	if (new_b_id < 0)
+	{
+		//ifree_custom(new_inodo_id);
+		return new_b_id ;
+	}
 	strcpy(inodos[new_inodo_id].nombre, path);
-	bloques_datos_map[new_bloqinode_id].pos_actual_bloq = 2;
-
+	bloques_datos_aux[new_bloqinode_id].pos_actual_bloq = alloc_databloq_custom(new_bloqinode_id);
+	// TODO: POR TERMINAR
 	inodos[new_inodo_id].num_bloque_inodo = new_bloqinode_id;
 	inodos[new_inodo_id - 1].bloque_next_inodo = new_bloqinode_id;
 	inodos[new_inodo_id - 1].num_contenidos = 1;
@@ -405,7 +413,7 @@ int ialloc_custom(void)
 /* Devuelve el primer bloque libre que encuentra*/
 int alloc_custom(void)
 {
-	char b[BLOCK_SIZE];	
+	//char b[BLOCK_SIZE];	
 	
 	for (int i = 0; i < BLOCK_SIZE; i++)
 	{
@@ -430,13 +438,14 @@ int alloc_custom(void)
 /* Devuelve el primer bloque libre que encuentra*/
 int alloc_databloq_custom(int id_bloque_Datos)
 {
-	char b[BLOCK_SIZE];	
+	//char b[BLOCK_SIZE];	
 	
 	for (int i = 0; i < sizeof(bloques_datos_map)/sizeof(bloques_datos_map[0]); i++)
 	{
-		int no_inodo = check_free_inode(id_bloque_Datos);
-		check_free_inode
-					if (i > 3 && inodos[j].num_bloque_inodo)
+		int no_inodo = check_free_inode(i);
+		int no_databloq = check_free_databloq(i);
+
+		if (i > 3 && no_inodo == 1 && no_databloq == 1)
 			return i;
 	}
 	return -1;
@@ -446,7 +455,19 @@ int check_free_inode(int num_bloque)
 {
 	for (int i = 0; i < sbloque.num_inodos; i++)
 	{
-		if (inodos[i].num_bloque_inodo)
+		if (inodos[i].num_bloque_inodo == num_bloque)
+		{
+			return 0;
+		}
+	}
+	return 1;
+}
+
+int check_free_databloq(int num_bloque)
+{
+	for (int i = 0; i < sbloque.num_bloque_datos; i++)
+	{
+		if (bloques_datos_aux[i].pos_actual_bloq == num_bloque)
 		{
 			return 0;
 		}
