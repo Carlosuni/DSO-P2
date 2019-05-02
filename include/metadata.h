@@ -17,6 +17,9 @@
 #define MAX_PATH_FOLDER 99 //unds, nombre incluido
 #define PADDING_SB '0' //unds, nombre incluido
 #define PADDING_INODO '0' //unds, nombre incluido
+#define DIVISOR '/'
+//#define TAM_INODO sizeof(struct i_nodo)
+//#define TAM_SB sizeof(struct SB)
 
 
 #define bitmap_getbit(bitmap_, i_) (bitmap_[i_ >> 3] & (1 << (i_ & 0x07)))
@@ -27,16 +30,32 @@ static inline void bitmap_setbit(char *bitmap_, int i_, int val_) {
     bitmap_[(i_ >> 3)] &= ~(1 << (i_ & 0x07));
 }
 
+char * bmap; //mapa de bloques, 0 no usado 1 si
+char * inodos; //mapa de inodos, 0 no usado 1 si
+
 //estructuras de datos y metadatos aqui 
 struct i_nodo
 {
+  unsigned short id;
   char nombre[32];
-  char data[BLOCK_SIZE];
-  int usado; // 0 no usado y 1 usado
-  int number;								/* Numero de bloques que componen el fichero */
-  int position;
-  int lleno;
+  unsigned short bloque_datos; //referencia al bloque de datos si es un archivo
+  unsigned short isDir; //indica si es directorio, 1 si, 0 no
+  unsigned short archivos[10]; //referencia de inodos que posee el directorio
+  unsigned short usado; // 1 si, 0 no
 };
+
+
+struct SB {
+  unsigned int num_magico;             /* Numero magico */
+  unsigned short tam_dispositivo; 				/* Tamaño total del disp. (en bytes) */
+  unsigned short num_inodos; 						/* Número de inodos en el dispositivo */
+  unsigned short num_bloques_Datos;      /* Numeros de bloques de datos */
+  unsigned short numero_bloques_totales; /* Numero de bloques totales */
+  unsigned short numero_bloques_inodos; /* Numero de bloques totales */
+};
+
+
+
 
 /* Estructura de inodos */
 typedef struct {
@@ -51,20 +70,6 @@ typedef struct {
   int fd;                   /* Sin usar 0, usado 1*/
 } TipoInodoDisco;
 
-
-struct SB {
-  int numBloquesMapaDatos; 			/* Número de bloques del mapa datos */
-  int numInodos; 						/* Número de inodos en el dispositivo */
-  int primerInodo; 					/* Número bloque del 1º inodo del disp. (inodo raíz) */
-  int numBloquesDatos; 				/* Número de bloques de datos en el disp. */
-  int busynodes;						/* Numero de nodos que estan en uso */	
-  int primerBloqueDatos; 				/* Número de bloque del 1º bloque de datos */
-  int tamDispositivo; 					/* Tamaño total del disp. (en bytes) */
-  int numTotalBloques;					/* Numero total de bloques pasador por parametro */
-  char bitMap[MAX_FILES/8];			/* Mapa de bits inodos */
-  struct i_nodo arraynode[MAX_FILES]; 		/* array de i- nodos 1600B */
-};
-
 /* Estructura de bloques de 2048B*/
 typedef struct {
   unsigned int num_magico;                /* Num magico del superbloque: 0x000D5500 */
@@ -78,7 +83,7 @@ typedef struct {
   unsigned int tam_dispositivo;           /* Tamanyo del dispositivo */
   char relleno[PADDING_SB];               /* Caracter de relleno = '0' */
   char ibitMap[MAX_FILES/8];			/* Mapa de bits inodos 5B */
-  TipoInodoDisco arraynode[MAX_FILES]; 		/* array de i- nodos 1600B */
+  //TipoInodoDisco arraynode[MAX_FILES]; 		/* array de i- nodos 1600B */
   int bloques_en_uso;
 } TipoSuperbloque;
 
@@ -92,5 +97,7 @@ typedef struct
 
   char data[2048];							/* Buffer de los datos del fichero */
 }  Bloque_datos;
+
+
 
 

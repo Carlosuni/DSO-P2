@@ -44,9 +44,9 @@ int main()
 	}
 	fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST mountFS ", ANSI_COLOR_GREEN, "SUCCESS\n", ANSI_COLOR_RESET);
 
-	///////
+	/////////
 
-	ret = createFile("/test.txt");
+	ret = createFile("/bin/test.txt");
 	if (ret != 0)
 	{
 		fprintf(stdout, "%s%s%s%s%s", ANSI_COLOR_BLUE, "TEST createFile ", ANSI_COLOR_RED, "FAILED\n", ANSI_COLOR_RESET);

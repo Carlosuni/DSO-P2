@@ -13,21 +13,21 @@
 #include <stdlib.h>
 #include <string.h>
 
-TipoSuperbloque sbloque;
-TipoInodoDisco* datos_inodo;
 struct SB sb;
-struct i_nodo* datos;
-Bloque_datos *bloque_datos;
+struct i_nodo * datos;
+struct i_nodo * datos2; //segundo bloque de inodos
 
 /*
  * @brief 	Generates the proper file system structure in a storage device, as designed by the student.
  * @return 	0 if success, -1 otherwise.
  */
+
 int mkFS(long deviceSize)
 {
 	/* Obtenemos el numero de bloques segun el tamanyo introducido */
-	// int aux = deviceSize/BLOCK_SIZE;
 	int num_bloques = deviceSize/BLOCK_SIZE;
+	//printf("inodo array size: %ld\n", sizeof(struct i_nodo)*40);
+	//printf("sb size %ld\n", sizeof(struct SB));
 
 	/* Comprueba que el tamanyo del device llega al minimo */
 	if (deviceSize < MIN_HDD){
@@ -42,29 +42,35 @@ int mkFS(long deviceSize)
 	}
 
 	/* Guardamos los atributos del struct TipoSuperbloque de metadata.h */
-	sbloque.num_magico = 0x000D5500; 
-	sbloque.num_bloques_mapa_datos = num_bloques -1; 
-	sbloque.num_bloque_datos = num_bloques - 1; 
-	sbloque.num_tot_bloques = num_bloques; 						
-	sbloque.num_inodos = MAX_FILES; 		
-	sbloque.primer_bloque_datos = 1;
-	sbloque.tam_dispositivo = deviceSize;
-	/* El resto se inicializan a 0 por defecto */	
-			
-	/* Mapa de bits de inodos inicializado a 0 (libres) */
-	for (int i = 0; i < MAX_FILES; i++){
-		bitmap_setbit(sbloque.ibitMap, i, 0);
-		sbloque.arraynode[i].fd = -1;			/* Iniciamos los descriptores de inodos a -1 */
-	} 
+	sb.num_magico = 0x000D5500; 
+	sb.tam_dispositivo = deviceSize;
+	sb.num_inodos = MAX_FILES;
+	sb.numero_bloques_totales = num_bloques;
+	sb.num_bloques_Datos = num_bloques - 3;
 
-	/* Iniciar los bloques de datos con una posicion y como vacios todos */
-	bloque_datos = calloc(sbloque.num_tot_bloques, sizeof(datos));
-	for (int j = 1; j < sbloque.num_bloque_datos; j++){
-	 	bloque_datos[j].pos_bloq_actual = j; 			/* Enumerar los bloque para tenerlos controlados desde 1 a N */
-	 	bloque_datos[j].lleno = '0';				/* Ponerlos todos como vacios */
-	 	/* No hace falta poner valores a los demas atributos de la estructura porque 
-	 		ya se han inicializado a 0 con la funcion calloc*/
+	/* Generamos la estructura de inodos de forma dinamica, por defecto 40 inodos */
+	datos = malloc(sizeof(struct i_nodo)*35);
+	for(int i=0;i<=35-1;i++){
+		datos[i].usado=0;
+		datos[i].id=i;
 	}
+	datos[0].isDir=1;
+	datos[0].usado=1;
+	strcpy(datos[0].nombre, "/");
+	
+	datos2 = malloc(sizeof(struct i_nodo)*5);
+	for(int i=0;i<=5-1;i++){
+		datos2[i].usado=0;
+		datos[i].id=35+i;
+	}
+
+	bmap = malloc(sizeof(char)*sb.numero_bloques_totales);
+	inodos = malloc(sizeof(char)*MAX_FILES);
+	bmap[0]='1';
+	bmap[1]='1';
+	bmap[2]='1';
+	printf("%s\n", bmap);
+	inodos[0]='1';
 
 	/* Invocamos umount */
 	unmountFS();
@@ -80,17 +86,17 @@ int mountFS(void)
 {	
 	/* Limpiamos inicialmente el superbloque */
 	char* buff = malloc(2048);
-	printf("%d\n", sbloque.num_tot_bloques);
-	memcpy(&sbloque, buff, sizeof(sbloque));
-	printf("%s\n", buff);
-
-
+	
 	/* Leemos el superbloque  */
 	bread(DEVICE_IMAGE, 0, buff);
-	printf("%li\n", sizeof(sbloque));
-	printf("%s\n", buff);
-	printf("%d\n", sbloque.num_tot_bloques);
-	
+	memcpy(&sb, buff, sizeof(sb));
+
+	bread(DEVICE_IMAGE, 1, buff);
+	memcpy(buff, &datos, sizeof(struct i_nodo));	
+
+	bread(DEVICE_IMAGE, 2, buff);
+	memcpy(buff, &datos2, sizeof(struct i_nodo));
+
 	return 0;
 }
 
@@ -101,9 +107,15 @@ int mountFS(void)
 int unmountFS(void)
 {
 	char* buff = malloc(2048);
-	memcpy(&sbloque, buff, sizeof(sbloque));
+	memcpy(buff, &sb, sizeof(struct SB));
 
 	bwrite(DEVICE_IMAGE, 0, buff);
+
+	memcpy(buff ,datos ,sizeof(struct i_nodo));	
+	bwrite(DEVICE_IMAGE, 1, buff);
+
+	memcpy(buff ,datos2 , sizeof(struct i_nodo));	
+	bwrite(DEVICE_IMAGE, 2, buff);
 	return 0;
 }
 
@@ -113,36 +125,17 @@ int unmountFS(void)
  */
 int createFile(char *path)
 {
-	int val = 0;
-	/* Buscar que no exista un fichero que tenga el mismo nombre que el que se quiera crear */
-	for (int i = 0; i < sbloque.num_inodos; i++){
-		if (strcmp(path, sbloque.arraynode[i].nombre) == 0){
-			perror("File already exists");
-			return -1;
-		}
+	int libre = contar_ficheros();
+	int blib = obtener_blq_libre();
+	printf("bloque l: %d\n", blib);
+	printf("%d\n", libre);
+	if(libre==0){
+		int ele = separar_path(path);
+		printf("%d\n", ele);
+		return 0;
+	}else{
+		return -1;
 	}
-
-	/* Buscar un espacio vacio */
-	for (int i = 0; i < sbloque.num_inodos; i++){
-		val = bitmap_getbit(sbloque.ibitMap, i);
-		if (val == '0'){ 								/* comprobamos que el inodo esta libre */
-			bitmap_setbit(sbloque.ibitMap, i, 1); 			/* Cambiamos el valor del i-nodo de FREE a BUSY  */
-			sbloque.arraynode[i].tamanyo = 0; 				/* Asignamos el tamaño inicial de 0B */
-			int aux = check_blq_libre();					/* Llamamos a la funcion para comprobar que haya algun ploque libre */
-			if (aux > 0){								/* Comprobamos el valor de la funcion */
-				sbloque.arraynode[i].bloqueDirecto = aux;	/* Asignamos dicho bloque como el primero en i-node */
-			} else {									/* En caso de que no haya bloques libres salta un error */
-				perror("File System can't create more files because all blocks of data are fulled");
-				return -2;
-			}
-			strcpy(sbloque.arraynode[i].nombre, path);	/* Copiamos el nombre del fichero */
-			bloque_datos[aux].num_bloques = 1;						/* Indicamos de cuantos bloques se compone el fichero */
-			bloque_datos[aux].pos_bloq_actual = aux;					/* Posicion actual del fichero */
-			bloque_datos[aux].siguiente_bloq = 0;
-			sbloque.bloques_en_uso++;								/* Actualizamos la variable con1 noda mas ocupado */
-		}		
-	}
-	return 0;
 }
 
 /*
@@ -223,18 +216,70 @@ int rmDir(char *path)
  */
 int lsDir(char *path, int inodesDir[10], char namesDir[10][33])
 {
+	char * tok = nombre_directorio(path);
+	printf("%s\n", tok);
 	return -2;
 }
 
 /* Comprueba si hay blosques libres en el bitmap del superbloque
 y devuelve la posiciónd el primero que encuentre */
-int check_blq_libre()
-{
-	for (int i = 0; i < sb.numBloquesMapaDatos; i++)
-	{
-		if (bloque_datos[i].lleno == '0'){
+int obtener_blq_libre()
+{	
+	int i=0;
+	for(i=0;i<=sb.numero_bloques_totales-1;i++){
+		/*if(strcmp(bmap[i], "0")==0){
 			return i;
-		}
+		}*/
+		return -1;
 	}
 	return -1;
 }
+
+// devuelve 0 si se puede añadir un fichero, sino devuelve -1;
+int contar_ficheros(){
+	int ficheros=0;
+	int i=0;
+	for(i=0;i<=35-1;i++){
+		if(datos[i].isDir==0 && datos[i].usado==1){
+			if(ficheros<MAX_FILES){
+				ficheros++;
+			}else{
+				return -1;
+			}
+			
+		}
+	}
+	for(i=0;i<=35-1;i++){
+		if(datos2[i].isDir==0 && datos[i].usado==1){
+			if(ficheros<MAX_FILES){
+				ficheros++;
+			}else{
+				return -1;
+			}
+		}
+	}
+	return 0;
+}
+
+//devuelve la longitud a la que se encuentra el archivo
+int separar_path(char * path){
+	int items=1;
+	char * tokens = strtok(path,"/");
+	while( tokens != NULL ) {
+    	printf( " %s\n", tokens );
+		items++;
+    	tokens = strtok(NULL,"/");
+   	}
+	return items;
+}
+
+char * nombre_directorio(char * path){
+	char * token = strtok(path,"/");
+	while( token != NULL ) {
+    	printf( " %s\n", token );
+    	token = strtok(NULL,"/");
+   	}
+	return token;
+}
+
+
