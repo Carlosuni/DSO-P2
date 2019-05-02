@@ -64,14 +64,6 @@ int mkFS(long deviceSize)
 		datos[i].id=35+i;
 	}
 
-	bmap = malloc(sizeof(char)*sb.numero_bloques_totales);
-	inodos = malloc(sizeof(char)*MAX_FILES);
-	bmap[0]='1';
-	bmap[1]='1';
-	bmap[2]='1';
-	printf("%s\n", bmap);
-	inodos[0]='1';
-
 	/* Invocamos umount */
 	unmountFS();
 
@@ -111,10 +103,10 @@ int unmountFS(void)
 
 	bwrite(DEVICE_IMAGE, 0, buff);
 
-	memcpy(buff ,datos ,sizeof(struct i_nodo));	
+	memcpy(buff ,&datos ,sizeof(struct i_nodo)*15);	
 	bwrite(DEVICE_IMAGE, 1, buff);
 
-	memcpy(buff ,datos2 , sizeof(struct i_nodo));	
+	memcpy(buff ,&datos2 , sizeof(struct i_nodo)*5);	
 	bwrite(DEVICE_IMAGE, 2, buff);
 	return 0;
 }
