@@ -1,13 +1,14 @@
-# OPERATING SYSTEMS DESING - 16/17
-# Makefile for OSD file system
+#
+# Makefile del sistema de ficheros
+#
 
 INCLUDEDIR=./include
 CC=gcc
-CFLAGS=-g -Wall -Werror -I$(INCLUDEDIR)
+CFLAGS=-g -Wall -I$(INCLUDEDIR)
 AR=ar
 MAKE=make
 
-OBJS_DEV= blocks_cache.o filesystem.o
+OBJS_DEV= ufs.o filesystem.o
 LIB=libfs.a
 
 
@@ -17,7 +18,7 @@ test: $(LIB)
 	$(CC) $(CFLAGS) -o test test.c libfs.a
 
 filesystem.o: $(INCLUDEDIR)/filesystem.h
-blocks_cache.o: $(INCLUDEDIR)/blocks_cache.h
+ufs.o: $(INCLUDEDIR)/ufs.h
 
 $(LIB): $(OBJS_DEV)
 	$(AR) rcv $@ $^
